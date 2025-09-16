@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Typing Game</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    background: #0f172a;
+    color: #f1f5f9;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+  }
+  .card {
+    background: #1e293b;
+    padding: 20px;
+    border-radius: 12px;
+    width: 850px;
+    max-width: 95%;
+  }
+  h1 { margin-top: 0; }
+  .words {
+    background: #334155;
+    padding: 16px;
+    border-radius: 8px;
+    min-height: 120px;
+    margin-bottom: 12px;
+    line-height: 1.8;
+    font-size: 18px;
+    user-select: none;
+  }
+  .word { margin-right: 8px; }
+  .word.current { background: #475569; border-radius: 4px; padding: 0 4px; }
+  .char.correct { color: #22c55e; }
+  .char.wrong { color: #ef4444; text-decoration: line-through; }
+  input {
+    width: 100%; padding: 10px; border-radius: 6px; border: none; font-size: 16px;
+  }
+  button {
+    margin-top: 12px; padding: 8px 16px; border: none; border-radius: 6px;
+    background: #38bdf8; color: #0f172a; font-weight: bold; cursor: pointer;
+  }
+  button:hover { background: #0ea5e9; }
+  .stats { margin-top: 12px; font-size: 16px; }
+  .win { color: #22c55e; font-weight: bold; }
+  .lose { color: #ef4444; font-weight: bold; }
+  #leaderboard {
+    margin-top: 20px;
+    background: #334155;
+    padding: 12px;
+    border-radius: 8px;
+  }
+  #leaderboard h2 { margin: 0 0 10px 0; }
+  #leaderboard ol { padding-left: 20px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Typing Challenge</h1>
+  <div id="setup">
+    <label>Enter your name: <input type="text" id="playerName"></label><br><br>
+    <label>Enter your current typing speed (WPM): <input type="number" id="currentSpeed"></label><br><br>
+    <button id="startBtn">Start Game</button>
+  </div>
+
+  <div id="game" style="display:none;">
+    <div class="words" id="words"></div>
+    <input id="input" type="text" placeholder="Type here..." disabled>
+    <div class="stats">
+      <span>Time: <span id="timer">0</span>s</span> | 
+      <span>WPM: <span id="wpm">0</span></span> | 
+      <span>Accuracy: <span id="accuracy">100%</span></span>
+    </div>
+    <div id="result"></div>
+  </div>
+
+  <div id="leaderboard">
+    <h2>🏆 Leaderboard</h2>
+    <ol id="leaderboardList"></ol>
+  </div>
+</div>
+
+<script>
+(() => {
+  const WORDS = "the quick brown fox jumps over the lazy dog practice makes perfect typing speed test game challenge victory improve coding javascript html css".split(" ");
+  const wordsEl = document.getElementById('words');
+  const inputEl = document.getElementById('input');
+  const timerEl = document.getElementById('timer');
+  const wpmEl = document.getElementById('wpm');
+  const accuracyEl = document.getElementById('accuracy');
+  const resultEl = document.getElementById('result');
+  const startBtn = document.getElementById('startBtn');
+  const leaderboardList = document.getElementById('leaderboardList');
+
+  let wordsArray = [];
+  let currentIndex = 0;
+  let correctChars = 0, totalTyped = 0;
+  let startTime, timerId;
+  let playerName = "";
+  let targetSpeed = 0;
+
+  function pickWords() {
+    return [...WORDS]; // use all words
+  }
+
+  function renderWords() {
+    wordsEl.innerHTML = '';
+    wordsArray.forEach((w, i) => {
+      const span = document.createElement('span');
+      span.className = 'word' + (i === currentIndex ? ' current' : '');
+      [...w].forEach(ch => {
+        const c = document.createElement('span');
+        c.className = 'char';
+        c.textContent = ch;
+        span.appendChild(c);
+      });
+      wordsEl.appendChild(span);
+      wordsEl.append(" ");
+    });
+  }
+
+  function startGame() {
+    playerName = document.getElementById('playerName').value.trim();
+    targetSpeed = parseInt(document.getElementById('currentSpeed').value, 10);
+    if (!playerName || isNaN(targetSpeed)) {
+      alert("Please enter your name and current typing speed!");
+      return;
+    }
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('game').style.display = 'block';
+
+    wordsArray = pickWords();
+    currentIndex = 0;
+    correctChars = 0;
+    totalTyped = 0;
+    renderWords();
+    inputEl.value = '';
+    inputEl.disabled = false;
+    inputEl.focus();
+    startTime = Date.now();
+    timerId = setInterval(updateStats, 1000);
+  }
+
+  function finishGame() {
+    clearInterval(timerId);
+    inputEl.disabled = true;
+    const elapsedMin = (Date.now() - startTime) / 1000 / 60;
+    const wpm = Math.round((correctChars / 5) / elapsedMin);
+    const acc = Math.round((correctChars / Math.max(totalTyped,1)) * 100);
+
+    if (wpm > targetSpeed && currentIndex >= wordsArray.length) {
+      resultEl.innerHTML = `<p class="win">🎉 Congratulations ${playerName}, you WIN!<br>
+        Your WPM: ${wpm} (Target: ${targetSpeed}) | Accuracy: ${acc}%</p>`;
+    } else {
+      resultEl.innerHTML = `<p class="lose">😢 Sorry ${playerName}, you lost.<br>
+        Your WPM: ${wpm} (Target: ${targetSpeed}) | Accuracy: ${acc}%</p>`;
+    }
+
+    updateLeaderboard(playerName, wpm);
+  }
+
+  function updateStats() {
+    const elapsedSec = Math.floor((Date.now() - startTime) / 1000);
+    timerEl.textContent = elapsedSec;
+    const elapsedMin = elapsedSec / 60;
+    const wpm = Math.round((correctChars / 5) / Math.max(elapsedMin,0.01));
+    const acc = Math.round((correctChars / Math.max(totalTyped,1)) * 100);
+    wpmEl.textContent = wpm;
+    accuracyEl.textContent = acc + "%";
+  }
+
+  function updateLeaderboard(name, wpm) {
+    let leaderboard = JSON.parse(localStorage.getItem("leaderboard") || "[]");
+    // check if player already exists
+    const existing = leaderboard.find(p => p.name === name);
+    if (existing) {
+      if (wpm > existing.wpm) existing.wpm = wpm; // update best score
+    } else {
+      leaderboard.push({ name, wpm });
+    }
+    // sort high to low
+    leaderboard.sort((a,b) => b.wpm - a.wpm);
+    // keep top 5
+    leaderboard = leaderboard.slice(0,5);
+    localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+    renderLeaderboard();
+  }
+
+  function renderLeaderboard() {
+    const leaderboard = JSON.parse(localStorage.getItem("leaderboard") || "[]");
+    leaderboardList.innerHTML = '';
+    leaderboard.forEach(p => {
+      const li = document.createElement('li');
+      li.textContent = `${p.name} - ${p.wpm} WPM`;
+      leaderboardList.appendChild(li);
+    });
+  }
+
+  inputEl.addEventListener('input', () => {
+    const val = inputEl.value.trim();
+    const curWord = wordsArray[currentIndex] || "";
+    const span = wordsEl.querySelectorAll('.word')[currentIndex];
+    const charSpans = span ? span.querySelectorAll('.char') : [];
+
+    totalTyped++;
+    for (let i=0; i<charSpans.length; i++) {
+      charSpans[i].classList.remove('correct','wrong');
+      if (val[i]) {
+        if (val[i] === curWord[i]) {
+          charSpans[i].classList.add('correct');
+          correctChars++;
+        } else {
+          charSpans[i].classList.add('wrong');
+        }
+      }
+    }
+
+    if (val === curWord) {
+      currentIndex++;
+      inputEl.value = '';
+      if (currentIndex >= wordsArray.length) {
+        finishGame();
+      } else {
+        renderWords();
+      }
+    }
+  });
+
+  startBtn.addEventListener('click', startGame);
+
+  // Render leaderboard on page load
+  renderLeaderboard();
+})();
+</script>
+</body>
+</html>
